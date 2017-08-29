@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension" xmlns:difx="http://schemas.microsoft.com/wix/DifxAppExtension">
+	<?define Manufacturer="BlackRidge Technology"?>
+	<?define ProductName="Activation Agent"?>
+	<?define Version="1.0.0.0"?>
+	<?define AA.Windows.IdentityApp_TargetDir=$(var.AA.Windows.IdentityApp.TargetDir)?>
+	<?define AA.WindowsSetup.CustomAction_TargetDir=$(var.AA.WindowsSetup.CustomAction.TargetDir)?><?define AA.Windows.IdentityKeyGen_TargetDir=$(var.AA.Windows.IdentityKeyGen.TargetDir)?>
+	<!--<?define AA.Windows.IdentityKeyGen_TargetDir=$(var.AA.Windows.IdentityKeyGen.TargetDir)?>-->
+
+	<Product Id="71a0e942-48b1-42ab-8584-9d446d80708a" Name="$(var.ProductName)" Language="1033" Version="$(var.Version)" Manufacturer="$(var.Manufacturer)" UpgradeCode="de790f23-1011-4166-8358-ceabf0ffc4fa">
+		<Package InstallerVersion="301" Compressed="yes" InstallScope="perMachine" />
+
+		<!-- License agreement -->
+		<WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)\EULA.rtf" />
+
+		<!-- Set properties -->
+		<SetDirectory Id="UserStartupFolder" Value="[%APPDATA]\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\" />
+		<Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+		<Property Id="BRGW_IP" Value="192.168.0.1" />
+		<Property Id="BRGW_PORT" Value="8443" />
+		<Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch IAA Service" />
+		<Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+		<Property Id="ASSISTANCE_START_VIA_REGISTRY">1</Property>
+		<Property Id="WixShellExecTarget" Value="[#AA.Windows.IdentityApp.exe]" />
+
+		<Binary Id="CustomAction" SourceFile="$(var.AA.WindowsSetup.CustomAction_TargetDir)AA.WindowsSetup.CustomAction.CA.dll" />
+
+
+		<!-- Custom actions -->
+		<CustomAction Id="LaunchApplication" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
+		<CustomAction Id="InstallActionID" BinaryKey="CustomAction" DllEntry="InstallAction" Return="check" Execute="deferred" HideTarget="no" Impersonate="no" />
+		<CustomAction Id="InstallActionID.SetProperty" Return="check" Property="InstallActionID" Value="LOCATION=[INSTALLFOLDER];" />
+		<CustomAction Id="UninstallActionID" BinaryKey="CustomAction" DllEntry="UninstallAction" Return="check" />
+
+		<!-- Create single installation file -->
+		<MediaTemplate EmbedCab="yes" />
+
+		<MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+		<InstallExecuteSequence>
+			<Custom Action="InstallActionID.SetProperty" After="InstallFiles" />
+			<Custom Action="InstallActionID" After="InstallActionID.SetProperty">NOT Installed and NOT PATCH</Custom>
+			<Custom Action="UninstallActionID" Before="RemoveFiles">(NOT UPGRADINGPRODUCTCODE) AND (REMOVE="ALL")</Custom>
+		</InstallExecuteSequence>
+
+		<!-- Check for required framework -->
+		<PropertyRef Id="WIX_IS_NETFRAMEWORK_462_OR_LATER_INSTALLED" />
+		<Condition Message="This application requires .NET Framework 4.6.2. Please install the .NET Framework then run this installer again.">
+			<![CDATA[Installed OR WIX_IS_NETFRAMEWORK_462_OR_LATER_INSTALLED]]>
+		</Condition>
+
+
+		<Feature Id="ProductFeature" Title="AA.WindowsSetup.Setup" Level="1">
+			<ComponentGroupRef Id="RegistryEntries" />
+			<ComponentGroupRef Id="ProductComponents" />
+			<ComponentGroupRef Id="TacLibs_files" />
+		</Feature>
+		<Feature Id="VCRedist150" Title="Visual C++ 15.1 Runtime" AllowAdvertise="no" Display="hidden" Level="1">
+			<MergeRef Id="VC150Redist" />
+		</Feature>
+		<Feature Id="VCRedist100" Title="Visual C++ 10 Runtime" AllowAdvertise="no" Display="hidden" Level="1">
+			<MergeRef Id="VC100Redist" />
+		</Feature>
+
+
+		<!-- Add UI to installer -->
+		<UI>
+			<UIRef Id="IAAWixUI_InstallDir" />
+			<UIRef Id="WixUI_ErrorProgressText" />
+			<Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
+		</UI>
+	</Product>
+
+	<Fragment>
+		<Directory Id="TARGETDIR" Name="SourceDir">
+			<Directory Id="ProgramFiles64Folder">
+				<Directory Id="ManufacturerFolder" Name="$(var.Manufacturer)">
+					<Directory Id="INSTALLFOLDER" Name="$(var.ProductName)">
+						<Directory Id="TacLibs" Name="TacLibs" />
+					</Directory>
+				</Directory>
+			</Directory>
+			<Directory Id="UserStartupFolder" />
+			<Directory Id="SystemFolder" Name="System32">
+				<Directory Id="DriversFolder" Name="Drivers" />
+			</Directory>
+		</Directory>
+	</Fragment>
+
+	<Fragment>
+		<DirectoryRef Id="TARGETDIR">
+			<Merge Id="VC150Redist" SourceFile="$(var.ProjectDir)SourceFiles\Microsoft_VC150_CRT_x64.msm" DiskId="1" Language="0" />
+			<Merge Id="VC100Redist" SourceFile="$(var.ProjectDir)SourceFiles\Microsoft_VC100_CRT_x64.msm" DiskId="1" Language="0" />
+		</DirectoryRef>
+	</Fragment>
+
+	<Fragment>
+		<ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+			<!-- TODO: Remove the comments around this Component element and the ComponentRef below in order to add resources to this installer. -->
+			<!-- <Component Id="ProductComponent"> -->
+			<!-- TODO: Insert files, registry keys, and other resources here. -->
+			<!-- </Component> -->
+			<Component Id="AAConfiguration.xml" Guid="80afa468-2b30-4b04-b600-035c86528fd6">
+				<File Id="AAConfiguration.xml" Name="AAConfiguration.xml" Source="$(var.AA.Windows.IdentityApp_TargetDir)AAConfiguration.xml" />
+				<util:XmlFile Id="AAConfigurationHostName" File="[#AAConfiguration.xml]" Action="setValue" ElementPath="//Configuration/GatewayEndPoint/Hostname" Value="[BRGW_IP]" />
+				<util:XmlFile Id="AAConfigurationPort" File="[#AAConfiguration.xml]" Action="setValue" ElementPath="//Configuration/GatewayEndPoint/Port" Value="[BRGW_PORT]" />
+				<util:XmlFile Id="AAConfigurationBootstrapService" File="[#AAConfiguration.xml]" Action="setValue" ElementPath="//Configuration/GatewayEndPoint/BootstrapService" Value="[BRGW_IP]" />
+			</Component>
+			<Component Id="libeay32.dll" Guid="89bb21b5-99e9-4580-beea-3819d78ce8a1">
+				<File Id="libeay32.dll" Name="libeay32.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)libeay32.dll" />
+			</Component>
+			<Component Id="AA.Windows.IdentityApp.exe" Guid="06f12953-f8a6-41bc-b93c-b18bf6fba9ed">
+				<File Id="AA.Windows.IdentityApp.exe" Name="AA.Windows.IdentityApp.exe" Source="$(var.AA.Windows.IdentityApp_TargetDir)AA.Windows.IdentityApp.exe" />
+			</Component>
+			<Component Id="AA.Windows.IdentityApp.exe.config" Guid="e4482b89-88e9-464c-898a-7851d5e7322d">
+				<File Id="AA.Windows.IdentityApp.exe.config" Name="AA.Windows.IdentityApp.exe.config" Source="$(var.AA.Windows.IdentityApp_TargetDir)AA.Windows.IdentityApp.exe.config" />
+			</Component>
+			
+			<Component Id="netstandard.dll" Guid="b918aea7-c45f-465b-b21f-880cfe948893">
+				<File Id="netstandard.dll" Name="netstandard.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)netstandard.dll" />
+			</Component>
+			<Component Id="Newtonsoft.Json.dll" Guid="12a83a31-2641-472f-b212-1f9d18ef0fcc">
+				<File Id="Newtonsoft.Json.dll" Name="Newtonsoft.Json.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)Newtonsoft.Json.dll" />
+			</Component>
+			<Component Id="System.AppContext.dll" Guid="d9e86ed8-7ca5-45f1-a22e-61fb1402ca4f">
+				<File Id="System.AppContext.dll" Name="System.AppContext.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.AppContext.dll" />
+			</Component>
+			<Component Id="System.Collections.dll" Guid="b15da26d-5af9-4879-8c7f-d00d7add81ff">
+				<File Id="System.Collections.dll" Name="System.Collections.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Collections.dll" />
+			</Component>
+			<Component Id="System.Diagnostics.Debug.dll" Guid="680bd28e-75a9-4d8c-b3fd-5c35cb8fa8f5">
+				<File Id="System.Diagnostics.Debug.dll" Name="System.Diagnostics.Debug.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Diagnostics.Debug.dll" />
+			</Component>
+			<Component Id="System.Globalization.dll" Guid="c59e149a-0a51-480e-aeee-9ba79ac12a9e">
+				<File Id="System.Globalization.dll" Name="System.Globalization.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Globalization.dll" />
+			</Component>
+			<Component Id="System.IO.dll" Guid="04a5b878-4081-4ab1-8f93-55c60edd774d">
+				<File Id="System.IO.dll" Name="System.IO.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.IO.dll" />
+			</Component>
+			<Component Id="System.IO.FileSystem.dll" Guid="f229ccc9-4575-438a-88f5-7ee58c70689f">
+				<File Id="System.IO.FileSystem.dll" Name="System.IO.FileSystem.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.IO.FileSystem.dll" />
+			</Component>
+			<Component Id="System.Linq.dll" Guid="c7c79e2c-51d4-4093-a871-f8b5d70920aa">
+				<File Id="System.Linq.dll" Name="System.Linq.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Linq.dll" />
+			</Component>
+			<Component Id="System.Linq.Expressions.dll" Guid="a253a96f-be61-425f-9f54-ce89686688e8">
+				<File Id="System.Linq.Expressions.dll" Name="System.Linq.Expressions.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Linq.Expressions.dll" />
+			</Component>
+			<Component Id="System.Net.Http.dll" Guid="f6ff1fc2-5cb7-442d-bfb4-9c9e50e148a0">
+				<File Id="System.Net.Http.dll" Name="System.Net.Http.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Net.Http.dll" />
+			</Component>
+			<Component Id="System.Net.Primitives.dll" Guid="a55a47c9-2b3f-4dce-adc2-c603a8f2004b">
+				<File Id="System.Net.Primitives.dll" Name="System.Net.Primitives.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Net.Primitives.dll" />
+			</Component>
+			<Component Id="System.Reflection.dll" Guid="1974ba5a-5314-4012-8828-50e23e15048e">
+				<File Id="System.Reflection.dll" Name="System.Reflection.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Reflection.dll" />
+			</Component>
+			<Component Id="System.Runtime.dll" Guid="166a37f8-e9aa-4a29-99be-81c1016848ee">
+				<File Id="System.Runtime.dll" Name="System.Runtime.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Runtime.dll" />
+			</Component>
+			<Component Id="System.Runtime.Extensions.dll" Guid="474c0038-db6b-4325-a6c4-cf9a5d3c74b7">
+				<File Id="System.Runtime.Extensions.dll" Name="System.Runtime.Extensions.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Runtime.Extensions.dll" />
+			</Component>
+			<Component Id="System.Runtime.InteropServices.RuntimeInformation.dll" Guid="d6299015-db43-419f-956c-d2f57c7a46e9">
+				<File Id="System.Runtime.InteropServices.RuntimeInformation.dll" Name="System.Runtime.InteropServices.RuntimeInformation.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Runtime.InteropServices.RuntimeInformation.dll" />
+			</Component>
+			<Component Id="System.Security.Cryptography.Algorithms.dll" Guid="791ce393-f5db-4f45-b385-553dd6f9329b">
+				<File Id="System.Security.Cryptography.Algorithms.dll" Name="System.Security.Cryptography.Algorithms.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Security.Cryptography.Algorithms.dll" />
+			</Component>
+			<Component Id="System.Security.Cryptography.Primitives.dll" Guid="c10ac3c1-4d97-40ac-8cef-0612b237b393">
+				<File Id="System.Security.Cryptography.Primitives.dll" Name="System.Security.Cryptography.Primitives.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Security.Cryptography.Primitives.dll" />
+			</Component>
+			<Component Id="System.Security.Cryptography.X509Certificates.dll" Guid="ee70af0d-c9bc-49f7-a3e1-f33a74ef7947">
+				<File Id="System.Security.Cryptography.X509Certificates.dll" Name="System.Security.Cryptography.X509Certificates.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Security.Cryptography.X509Certificates.dll" />
+			</Component>
+			<Component Id="System.Text.Encoding.dll" Guid="afcd91db-2e7b-4411-80c0-056faf21a895">
+				<File Id="System.Text.Encoding.dll" Name="System.Text.Encoding.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Text.Encoding.dll" />
+			</Component>
+			<Component Id="System.Threading.dll" Guid="2366720d-9bbf-40d4-b046-5420a8505367">
+				<File Id="System.Threading.dll" Name="System.Threading.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Threading.dll" />
+			</Component>
+			<Component Id="System.Threading.Tasks.dll" Guid="8c26eed9-dc0c-4113-8c62-aa20de653444">
+				<File Id="System.Threading.Tasks.dll" Name="System.Threading.Tasks.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Threading.Tasks.dll" />
+			</Component>
+			<Component Id="System.Xml.ReaderWriter.dll" Guid="3d88e8e8-58d3-491d-921b-562442693503">
+				<File Id="System.Xml.ReaderWriter.dll" Name="System.Xml.ReaderWriter.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Xml.ReaderWriter.dll" />
+			</Component>
+			<Component Id="System.Xml.XDocument.dll" Guid="89a25c43-6584-4063-a161-febd72c19917">
+				<File Id="System.Xml.XDocument.dll" Name="System.Xml.XDocument.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)System.Xml.XDocument.dll" />
+			</Component>
+				
+
+			<Component Id="AA.Core.Identity.dll" Guid="f02f45c0-9917-410e-a255-b094414f077b">
+				<File Id="AA.Core.Identity.dll" Name="AA.Core.Identity.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)AA.Core.Identity.dll" />
+			</Component>
+			<Component Id="Install.bat" Guid="c58ffafe-a589-49da-bb3b-a0e576c34084">
+				<File Id="Install.bat" Name="Install.bat" Source="$(var.AA.WindowsSetup.CustomAction.TargetDir)scripts/Install.bat" />
+			</Component>
+			<Component Id="Delete.bat" Guid="c73f7115-6d72-4091-b454-ff900e2b17aa">
+				<File Id="Delete.bat" Name="Delete.bat" Source="$(var.AA.WindowsSetup.CustomAction.TargetDir)scripts/Delete.bat" />
+			</Component>
+			<Component Id="blackridge.inf" Guid="02578af1-4f41-42a1-b7ae-4667f84edc1f">
+				<File Id="blackridge.inf" Name="blackridge.inf" Source="$(var.ProjectDir)SourceFiles/blackridge.inf" />
+			</Component>
+			<Component Id="brcloak.cat" Guid="d7979b39-08e1-411b-8373-d304d1cd46c0">
+				<File Id="brcloak.cat" Name="brcloak.cat" Source="$(var.ProjectDir)SourceFiles/brcloak.cat" />
+			</Component>
+			<Component Id="brcloak.sys" Guid="3d57f6d8-44d5-4fc2-870c-e36adc5eadb9">
+				<File Id="brcloak.sys" Name="brcloak.sys" Source="$(var.ProjectDir)SourceFiles/brcloak.sys" />
+			</Component>
+			<Component Id="brcloak.cer" Guid="2fadf473-3b86-4d0c-ae37-51c8780ae13c">
+				<File Id="brcloak.cer" Name="brcloak.cer" Source="$(var.ProjectDir)SourceFiles/brcloak.cer" />
+			</Component>
+			<!--<Component Id="netlwf.cat" Guid="2fadf473-3b86-4d0c-ae37-51c8780ae13c">
+        <File Id="netlwf.cat" Name="netlwf.cat" Source="$(var.ProjectDir)SourceFiles/netlwf.cat" />
+      </Component>-->
+			<Component Id="AA.Core.Common.dll" Guid="a2b21c49-ffce-40af-ab4b-bda0218967d0">
+				<File Id="AA.Core.Common.dll" Name="AA.Core.Common.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)AA.Core.Common.dll" />
+			</Component>
+			<Component Id="AA.Windows.IdentityKeyGen.exe" Guid="b433732b-2960-4b3f-9b1e-38bd5f92d9f8">
+			  <File Id="AA.Windows.IdentityKeyGen.exe" Name="AA.Windows.IdentityKeyGen.exe" Source="$(var.AA.Windows.IdentityKeyGen_TargetDir)AA.Windows.IdentityKeyGen.exe" />
+			</Component>
+			<Component Id="AA.Windows.IdentityKeyGen.exe.config" Guid="a0e7484d-41af-4f13-801e-cc2035702fe1">
+			  <File Id="AA.Windows.IdentityKeyGen.exe.config" Name="AA.Windows.IdentityKeyGen.exe.config" Source="$(var.AA.Windows.IdentityKeyGen_TargetDir)AA.Windows.IdentityKeyGen.exe.config" />
+			</Component>
+			<Component Id="BouncyCastle.Crypto.dll" Guid="fa559176-8a33-42e6-a80d-801618a4dac2">
+			  <File Id="BouncyCastle.Crypto.dll" Name="BouncyCastle.Crypto.dll" Source="$(var.AA.Windows.IdentityKeyGen_TargetDir)BouncyCastle.Crypto.dll" />
+			</Component>
+			<Component Id="Mono.Options.dll" Guid="a87b123b-f5f1-4700-8587-b319dce19e7b">
+			  <File Id="Mono.Options.dll" Name="Mono.Options.dll" Source="$(var.AA.Windows.IdentityKeyGen_TargetDir)Mono.Options.dll" />
+			</Component>
+		</ComponentGroup>
+	</Fragment>
+	<Fragment>
+		<ComponentGroup Id="TacLibs_files" Directory="TacLibs">
+			<Component Id="TacLibs_BRToken_64.dll" Guid="48a12cdc-71f1-41d9-af02-e599711d43fa">
+				<File Id="TacLibs_BRToken_64.dll" Name="BRToken_64.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)TacLibs\BRToken_64.dll" />
+			</Component>
+			<Component Id="TacLibs_iap_64.dll" Guid="b14780b5-7cdf-4d89-b2b9-a6a1eedaf033">
+				<File Id="TacLibs_iap_64.dll" Name="iap_64.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)TacLibs\iap_64.dll" />
+			</Component>
+			<Component Id="TacLibs_iap_32.dll" Guid="05664b88-19ea-4c15-9e79-a835b711429d">
+				<File Id="TacLibs_iap_32.dll" Name="iap_32.dll" Source="$(var.AA.Windows.IdentityApp_TargetDir)TacLibs\iap_32.dll" />
+			</Component>
+		</ComponentGroup>
+	</Fragment>
+	<Fragment>
+		<ComponentGroup Id="RegistryEntries" Directory="TARGETDIR">
+			<!--Logging components-->
+			<Component Id="EventLog" Guid="284868E7-B841-4730-834C-3123E1E7E2B6">
+				<RegistryKey Root="HKLM" Key="System\CurrentControlSet\Services\EventLog\Application\IAAService" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+					<RegistryValue Type="string" Name="EventMessageFile" Value="C:\Windows\Microsoft.NET\Framework\v4.0.30319\EventLogMessages.dll" />
+				</RegistryKey>
+				<RegistryKey Root="HKLM" Key="System\CurrentControlSet\Services\EventLog\Application\IBAService" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+					<RegistryValue Type="string" Name="EventMessageFile" Value="C:\Windows\Microsoft.NET\Framework\v4.0.30319\EventLogMessages.dll" />
+				</RegistryKey>
+			</Component>
+
+			<!--Auto start component-->
+			<Component Id="RegistryStartup" Guid="bf920921-9d17-4e31-a1eb-6a68693897bf">
+				<RegistryKey Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run" ForceCreateOnInstall="yes" ForceDeleteOnUninstall="yes">
+					<RegistryValue Id="clientapp" Name="AAService" Value="[INSTALLFOLDER]AA.Windows.IdentityApp.exe" Type="string" />
+				</RegistryKey>
+				<Condition>ASSISTANCE_START_VIA_REGISTRY</Condition>
+			</Component>
+		</ComponentGroup>
+	</Fragment>
+</Wix>

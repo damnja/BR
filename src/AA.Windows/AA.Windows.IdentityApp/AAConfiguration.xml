@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration xmlns="http://www.blackridge.us/XMLSchema/IAAConfiguration/v1.0">
+	
+	<GatewayEndPoint>
+		<!-- Define if Identity Activation will be active-->
+		<UserActivation>true</UserActivation>
+		<!-- GatewayInitialize URL: The URL of initialize GW api.-->
+		<!-- GatewayInitialize maximum-retries: The number of times identity agent will try to call initialize GW api.-->
+		<!-- GatewayInitialize retry-interval: The amount of time in seconds until identity agent will call initialize GW api, in case previous call failed.-->
+		<GatewayInitialize
+			url="/blackridge/api/v1/activation/initialize"
+			maximum-retries="10"
+			retry-interval="5"/>
+		<!-- GatewayRefresh URL: The URL of refresh GW api-->	
+		<!-- GatewayRefresh refresh-interval: The amount of time in second when the IAA will call refresh GW api-->	
+		<GatewayRefresh 
+			url="/blackridge/api/v1/activation/refresh/"
+			refresh-interval="5"/>
+		<!-- Gateway IP address: IP address where Initialize and Refresh request will be sent-->
+		<Hostname>192.168.0.222</Hostname>
+		<!-- Gateway Port number-->
+		<Port>8443</Port>
+		<!-- Define if TAC GW will work on secure protocol or not: HTTP or HTTPS -->
+		<UseSsl>true</UseSsl>
+		<!-- Define if TAC GW communication will work even if certificates are not signed by valid authority : "true" means that certificates must be signed by valid authority-->
+		<VerifySsl>true</VerifySsl>
+		<!-- Define if Bootstrap Activation will be active-->
+		<UserBootstrapActivation>true</UserBootstrapActivation>
+		<!-- Gateway Bootstrap IP address: defines IP address of bootstrap services on GW-->
+		<BootstrapService>192.168.0.222</BootstrapService>
+	</GatewayEndPoint>
+</Configuration>

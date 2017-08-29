@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "GeneratorSwitchCore": {
+      "commandName": "Project",
+      "commandLineArgs": "-mvk -pathToPrivateKey=\"C:\\TestKeys\\PrivateKey.key\" -pathToCertKey=\"C:\\TestKeys\\Cert.crt\" -pathToChain=\"C:\\TestKeys\\Chain.txt\""
+    }
+  }
+}
